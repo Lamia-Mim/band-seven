@@ -21,8 +21,17 @@ export default defineConfig({
         scope: '/band-seven/',
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }],
       },
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,png,woff2}'] },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // the on-device AI runtime is 6 MB: fetch it only for people who choose it, then keep it
+        globIgnores: ['**/webllm*'],
+        runtimeCaching: [{ urlPattern: /\/assets\/webllm.*\.js$/, handler: 'CacheFirst', options: { cacheName: 'webllm-runtime' } }],
+      },
     }),
   ],
+  build: {
+    rollupOptions: { output: { manualChunks: (id) => (id.includes('@mlc-ai/web-llm') ? 'webllm' : undefined) } },
+    chunkSizeWarningLimit: 7000,
+  },
   test: { environment: 'node' },
 });

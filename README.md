@@ -1,30 +1,37 @@
 # Band Seven
 
-A daily IELTS Academic study plan that works in the browser, free, with no account or API key.
+A personal IELTS Academic study plan in the browser, with an AI tutor and a voice speaking examiner. Free, no account.
 
 Live: https://lamia-mim.github.io/band-seven/
 
-Set your exam date and how many sections you want each day (2 or all 4). The app builds a plan up to the day before the exam, in four phases: Foundation, Skill building, Exam practice and Final stretch. Every day has a short list of tasks. Finish them all to unlock the next reward.
+A short setup asks for your exam date, level, target band, how each skill feels (1–5) and how much time you have each day (30–120 minutes, 5–7 days a week). The app builds a plan up to the day before the exam, in four phases (Foundation, Skill building, Exam practice, Final stretch) sized to the time you have, with your weakest skills practised most.
 
 ## What's inside
 
-- **Daily plan.** Two sections a day (Reading + Speaking, then Listening + Writing) or all four. Vocabulary every day, grammar in the first phase, a weekly review day, and weekly mock tests in the last two phases.
-- **Grammar.** 12 lessons from the basics, each with the mistakes Bangla speakers make most often and a quiz.
-- **Vocabulary.** 300 academic and topic words with Bangla meanings, synonyms and examples. Flashcards use spaced repetition.
-- **Reading.** Three original Academic passages (40 questions: True/False/Not Given, headings, matching, completion, multiple choice), marked automatically with a band estimate.
-- **Listening.** Four original sections in IELTS order (40 questions), read aloud by the browser's built-in voices.
-- **Writing.** Six Task 1 visuals drawn from data and 24 Task 2 prompts, with a timer, a word count, a Band 7 checklist and model answers that unlock after you submit your own.
-- **Speaking.** 15 Part 1 topics and 40 cue cards with Part 3 questions. Your answers are recorded on the device and, in Chrome and Edge, transcribed to count words per minute, filler words and vocabulary variety.
-- **Mock tests.** A full Listening and Reading test with band conversion, timed Writing and Speaking tests, and score entry for tests from Cambridge books.
-- **Rewards.** An Examiner Secret card for every finished day, a Band 7 phrase pack for every 7-day streak, and a guide at the end of each phase.
-- **Library.** Keep your own PDFs and images in the browser (IndexedDB). They are never uploaded.
-- **Works offline.** Installable as a PWA. Progress is stored on the device; Settings has backup and restore.
+- **Daily routine.** Each day is a short timeline the way high scorers study: vocabulary warm-up, a grammar foundation, a timed focus session, a second skill, and daily speaking. Weekly review days early on, weekly full mocks later, rest days that don't break your streak, and a calm exam eve.
+- **AI tutor.** Ask anything in English or Bangla, by text or voice. Every wrong Reading, Listening and grammar answer has a "Why?" button that explains the trap.
+- **Voice room.** A full Speaking test (Parts 1–3 with a cue card and one minute to prepare) or a free conversation, spoken aloud and answered by voice, then band estimates and corrections.
+- **AI writing feedback.** Criterion-by-criterion band estimates, top corrections and a paragraph rewritten to Band 7+.
+- **Vocabulary.** 300 academic words with Bangla meanings, plus your own words (the AI can fill in the meaning, synonyms and an example). Flashcards use spaced repetition.
+- **Practice content.** 12 grammar lessons, a full Reading and Listening test (original material), 6 Task 1 visuals, 24 Task 2 prompts, 15 Part 1 topics and 40 cue cards, a mock test centre and score entry for Cambridge books.
+- **Rewards that teach.** XP and ten levels; each level unlocks a masterclass (essay blueprint, Band 6 vs Band 8, Part 2 story method, Listening traps, pronunciation for Bangla speakers…). Badges, a phrase pack and a streak shield every 7-day streak, an examiner insight for every finished day, and a guide at the end of each phase.
+- **Library, offline, backup.** Keep your own PDFs and images on the device. Installable as a PWA.
+
+### How the AI runs
+
+Students choose in the app:
+
+- **On this device** (default): an open model (Llama 3.2 1B, Qwen3 1.7B or 4B) runs in the browser with WebLLM and WebGPU. Free and private, but a 1–3 GB one-time download and a recent laptop or phone are needed.
+- **Gemini** with the student's own free API key from Google AI Studio.
+- **Claude** with the student's own Anthropic API key.
+
+Keys stay in the browser's storage, are sent only to that provider, and are left out of backups. Speech uses the browser's built-in recognition and voices (best in Chrome and Edge); when recognition isn't available, the Voice room takes typed answers.
 
 The Cambridge IELTS books are copyrighted, so they are not included. Students can add copies they own to their Library, and the app links to free official practice material.
 
 ## Stack
 
-React 18, Vite, React Router (hash routing for GitHub Pages), vite-plugin-pwa, idb-keyval. Browser APIs: Web Speech (speech synthesis and recognition), MediaRecorder, IndexedDB.
+React 18, Vite, React Router (hash routing for GitHub Pages), vite-plugin-pwa, idb-keyval, WebLLM (in a Web Worker, loaded only when chosen), the Anthropic SDK and the Gemini REST API. Browser APIs: Web Speech, Web Audio (mic level for the voice orb), MediaRecorder, IndexedDB, WebGPU.
 
 The plan generator ([`src/lib/plan.js`](src/lib/plan.js)), rewards ([`src/lib/progress.js`](src/lib/progress.js)), spaced repetition, band conversion and marking are pure functions with unit tests.
 
@@ -33,6 +40,6 @@ The plan generator ([`src/lib/plan.js`](src/lib/plan.js)), rewards ([`src/lib/pr
 ```sh
 npm install
 npm run dev
-npm test        # plan, rewards, marking, bands and content checks
+npm test        # plan, rewards, levels, badges, marking, bands and content checks
 npm run deploy  # build and publish to the gh-pages branch
 ```

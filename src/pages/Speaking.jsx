@@ -1,8 +1,22 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Icon } from '../components/icons.jsx';
 import { CUE_CARDS, PART1 } from '../data/index.js';
 import SpeakingSession from '../components/SpeakingSession.jsx';
 import { PageHead, TaskDone, useTask } from '../components/ui.jsx';
 import { useStore } from '../lib/store.jsx';
+
+// Offer the voice examiner first; recording yourself stays available below
+function AiChoice({ cardRef }) {
+  const { search } = useLocation();
+  const t = new URLSearchParams(search).get('task');
+  return (
+    <Link to={`/talk?mode=test&card=${cardRef}${t ? `&task=${t}` : ''}`} className="card link raised s-speaking" style={{ display: 'flex', gap: 16, alignItems: 'center', borderTop: '4px solid var(--speaking)' }}>
+      <span className="task__icon" style={{ width: 52, height: 52 }}><Icon name="wave" /></span>
+      <span style={{ flex: 1 }}><b style={{ fontFamily: 'var(--display)', fontSize: 17 }}>Practise with the AI examiner</b><br /><span className="small muted">A real conversation by voice: it asks, listens, follows up, then gives band estimates and corrections.</span></span>
+      <span className="btn skill sm">Start</span>
+    </Link>
+  );
+}
 
 function useFinish(label) {
   const { addScore } = useStore();
@@ -17,7 +31,8 @@ export function SpeakingHub() {
   const nav = useNavigate();
   return (
     <>
-      <PageHead kicker="Speaking" title="Speaking practice" sub="Record yourself, listen back, and check your fluency and vocabulary." back="/practice">
+      <PageHead kicker="Speaking" title="Speaking practice" sub="Talk with the AI examiner by voice, or record yourself and check your fluency." back="/practice">
+        <Link className="btn" to="/talk"><Icon name="wave" />Voice room</Link>
         <button type="button" className="btn primary" onClick={() => nav(`/speaking/card/${Math.floor(Math.random() * CUE_CARDS.length)}`)}>Random cue card</button>
       </PageHead>
       <div className="stack">
@@ -55,6 +70,8 @@ export function SpeakingCard() {
       <PageHead kicker="Speaking · Part 2" title="Cue card" sub="One minute to prepare, then talk for up to two minutes." back={task ? '/' : '/speaking'} />
       <div className="stack" style={{ maxWidth: 760 }}>
         <TaskDone show={done} />
+        <AiChoice cardRef={ref} />
+        <p className="kicker" style={{ textAlign: 'center' }}>or record yourself</p>
         <SpeakingSession key={ref} segments={[{ type: 'card', card }]} onFinish={onFinish}
           extra={(
             <section className="card stack">
@@ -100,6 +117,8 @@ export function SpeakingFull() {
       <PageHead kicker="Speaking · full test" title="Parts 1, 2 and 3" sub={`Part 1: ${p1.topic} · Part 2: ${card.title}`} back={task ? '/' : '/speaking'} />
       <div className="stack" style={{ maxWidth: 760 }}>
         <TaskDone show={done} />
+        <AiChoice cardRef={ref} />
+        <p className="kicker" style={{ textAlign: 'center' }}>or record yourself</p>
         <SpeakingSession key={ref} segments={segments} onFinish={onFinish} />
       </div>
     </>

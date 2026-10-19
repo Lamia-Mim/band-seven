@@ -3,6 +3,9 @@ import { canRecord, canSpeak, canTranscribe, playScript, speechStats, startRecor
 import { SPEAKING_CHECK } from '../data/speaking.js';
 import { mmss, useCountdown } from './ui.jsx';
 import { Icon } from './icons.jsx';
+import Markdown from './Markdown.jsx';
+import { useAi } from './ai/Ai.jsx';
+import { speakingFeedbackPrompt } from '../lib/ai/prompts.js';
 
 // A speaking practice made of segments:
 //   { type: 'q', part, text }   a question to answer
@@ -22,7 +25,7 @@ export default function SpeakingSession({ segments, onFinish, extra }) {
   const seg = segments[i];
   const isCard = seg?.type === 'card';
 
-  useEffect(() => () => { tr.current?.stop(); rec.current?.stop(); speechSynthesis?.cancel?.(); }, []);
+  useEffect(() => () => { tr.current?.stop(); rec.current?.stop(); window.speechSynthesis?.cancel(); }, []);
 
   async function start() {
     setMicError('');
@@ -120,6 +123,7 @@ export default function SpeakingSession({ segments, onFinish, extra }) {
       ) : (
         <p className="notice">Practice time: {mmss(stats?.seconds ?? 0)}. {stats?.transcribed ? 'No speech was transcribed: check your microphone.' : ''}</p>
       )}
+      {text.split(/\s+/).length > 15 && <TranscriptFeedback text={text} />}
       <div className="card checklist">
         <h3>Check yourself against Band 7</h3>
         {SPEAKING_CHECK.map(([crit, items]) => (
@@ -150,6 +154,26 @@ function CardStage({ card, stage, onDone }) {
         <button type="button" className="btn primary" onClick={onDone}>{stage === 'prep' ? 'Start talking now' : 'Finish'}</button>
       </div>
       {stage === 'prep' && <textarea rows="4" placeholder="Notes: key words for each point, plus one extra idea or story…" aria-label="Notes" />}
+    </div>
+  );
+}
+
+function TranscriptFeedback({ text }) {
+  const { requireAi, stream } = useAi();
+  const [out, setOut] = useState(null);
+  function run() {
+    requireAi(async () => {
+      setOut('');
+      let acc = '';
+      try {
+        for await (const t of stream({ system: 'You are an experienced, encouraging IELTS Speaking examiner.', messages: [{ role: 'user', content: speakingFeedbackPrompt(text) }] })) { acc += t; setOut(acc); }
+      } catch (e) { setOut(`⚠️ ${e.message}`); }
+    });
+  }
+  return (
+    <div className="card raised stack" style={{ borderTop: '4px solid var(--brand)' }}>
+      <div className="row"><Icon name="sparkle" /><h3>AI examiner feedback</h3><span className="spacer" />{out == null && <button type="button" className="btn primary sm" onClick={run}>Get feedback</button>}</div>
+      {out == null ? <p className="small muted">Band estimates, corrections of your own sentences, and better words, from your transcript.</p> : out ? <Markdown text={out} /> : <span className="typing"><span /><span /><span /></span>}
     </div>
   );
 }

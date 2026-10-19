@@ -14,6 +14,14 @@ export default function Practice() {
     <>
       <PageHead kicker="Free practice" title="Practice" sub="Everything in the app, any time. Your daily tasks link here too." />
       <div className="stack">
+        <Link to="/talk" className="hero" style={{ textDecoration: 'none' }}>
+          <div>
+            <p className="kicker" style={{ color: 'rgba(255,255,255,.85)' }}>New · Voice room</p>
+            <h1 style={{ fontSize: 28 }}>Talk with your AI examiner</h1>
+            <p className="sub">A full Speaking test or a relaxed conversation, by voice, with band estimates and corrections at the end.</p>
+          </div>
+          <span className="countdown-big"><Icon name="mic" width="40" height="40" /></span>
+        </Link>
         <section className="card stack">
           <div className="row"><Icon name="reading" width="20" /><h2>Reading</h2></div>
           <div className="grid2">

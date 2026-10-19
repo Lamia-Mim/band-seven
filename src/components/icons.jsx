@@ -28,6 +28,19 @@ const P = {
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14',
   external: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3',
   flag: 'M4 22V4M4 4h12l-2 4 2 4H4',
+  sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z',
+  flame: 'M12 2c1 3 4 5 4 9a4 4 0 0 1-8 0c0-1.5.5-2.5 1.5-3.5C9.5 9 10 10 11 10c0-3 1-5 1-8zM6 15a6 6 0 0 0 12 0',
+  shield: 'M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z',
+  chat: 'M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z',
+  send: 'M22 2 11 13M22 2l-7 20-4-9-9-4z',
+  plus: 'M12 5v14M5 12h14',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  lock: 'M6 11h12v10H6zM8 11V8a4 4 0 0 1 8 0v3',
+  bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
+  cpu: 'M8 8h8v8H8zM4 9h2M4 15h2M18 9h2M18 15h2M9 4v2M15 4v2M9 18v2M15 18v2M6 6h12v12H6z',
+  key: 'M15 7a4 4 0 1 1-3.9 5H8v3H5v-3H3v-3h8.1A4 4 0 0 1 15 7z',
+  close: 'M18 6 6 18M6 6l12 12',
+  wave: 'M2 12h2M6 8v8M10 5v14M14 8v8M18 10v4M22 12h0',
 };
 
 export function Icon({ name, ...rest }) {
@@ -39,7 +52,7 @@ export function Icon({ name, ...rest }) {
 }
 
 export const SECTION_ICON = {
-  vocab: 'vocab', grammar: 'grammar', reading: 'reading', listening: 'listening', writing: 'writing', speaking: 'speaking',
+  vocab: 'vocab', grammar: 'grammar', reading: 'reading', listening: 'listening', writing: 'writing', speaking: 'speaking', talk: 'wave',
   review: 'review', 'mock-listening': 'listening', 'mock-reading': 'reading', 'mock-writing': 'writing', 'mock-speaking': 'speaking',
-  tips: 'rewards', checklist: 'flag',
+  tips: 'sparkle', checklist: 'flag',
 };

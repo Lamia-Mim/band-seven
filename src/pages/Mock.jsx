@@ -8,6 +8,7 @@ import { ScoreSummary, useMarking } from '../components/useMarking.jsx';
 import { Passage } from './Reading.jsx';
 import { WritingEditor, Feedback } from './Writing.jsx';
 import { useStore } from '../lib/store.jsx';
+import { explainListening, explainReading } from '../lib/ai/explain.js';
 
 const allGroups = (items) => items.flatMap((x) => x.groups);
 
@@ -55,7 +56,7 @@ export function MockListening() {
         {LISTENING.map((sec) => (
           <div className="card" key={sec.id}>
             <p className="kicker">{sec.level}</p>
-            <QuestionSet groups={sec.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} />
+            <QuestionSet groups={sec.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} explain={(g, item, given) => explainListening(sec, g, item, given)} />
           </div>
         ))}
         {!m.result
@@ -86,7 +87,7 @@ export function MockReading() {
         <div className="split">
           <Passage passage={passage} />
           <div className="card">
-            <QuestionSet groups={passage.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} />
+            <QuestionSet groups={passage.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} explain={(g, item, given) => explainReading(passage, g, item, given)} />
             <div className="row" style={{ marginTop: 20 }}>
               {tab < READING.length - 1 && <button type="button" className="btn" onClick={() => { setTab(tab + 1); window.scrollTo(0, 0); }}>Next passage</button>}
               <span className="spacer" />

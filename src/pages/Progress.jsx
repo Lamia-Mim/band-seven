@@ -2,7 +2,6 @@ import { useStore } from '../lib/store.jsx';
 import { completedDays, isDayDone, streak } from '../lib/progress.js';
 import { isLearned } from '../lib/srs.js';
 import { diffDays, todayKey } from '../lib/dates.js';
-import { WORDS } from '../data/index.js';
 import { PageHead } from '../components/ui.jsx';
 
 function Trend({ scores }) {
@@ -39,12 +38,16 @@ function Trend({ scores }) {
 }
 
 export default function Progress() {
-  const { state, plan } = useStore();
+  const { state, plan, allWords } = useStore();
   const today = todayKey();
   const days = completedDays(plan, state.done);
   let best = 0, run = 0;
-  for (const d of plan.days) { run = isDayDone(d, state.done) ? run + 1 : 0; best = Math.max(best, run); }
-  const learned = WORDS.filter((w) => isLearned(state.vocab[w.id])).length;
+  for (const d of plan.days) {
+    if (d.type === 'rest') continue;
+    run = isDayDone(d, state.done) || state.shielded.includes(d.date) ? run + 1 : 0;
+    best = Math.max(best, run);
+  }
+  const learned = allWords.filter((w) => isLearned(state.vocab[w.id])).length;
   const essays = Object.values(state.writing).filter((w) => w.submitted).length;
   const speaking = state.scores.filter((s) => s.section === 'speaking');
   const avgWpm = speaking.filter((s) => s.wpm).reduce((a, s, _, arr) => a + s.wpm / arr.length, 0);
@@ -57,8 +60,8 @@ export default function Progress() {
       <div className="stack">
         <div className="kpis">
           <div className="kpi"><b>{days}/{plan.n}</b><span>days complete</span></div>
-          <div className="kpi"><b>{streak(plan, state.done, today)}</b><span>current streak · best {best}</span></div>
-          <div className="kpi"><b>{learned}</b><span>words learned of {WORDS.length}</span></div>
+          <div className="kpi"><b>{streak(plan, state.done, today, state.shielded)}</b><span>current streak · best {best}</span></div>
+          <div className="kpi"><b>{learned}</b><span>words learned of {allWords.length}</span></div>
           <div className="kpi"><b>{essays}</b><span>writing tasks submitted</span></div>
           <div className="kpi"><b>{speaking.length}</b><span>speaking sessions{avgWpm ? ` · ${Math.round(avgWpm)} wpm avg` : ''}</span></div>
         </div>

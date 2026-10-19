@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { GRAMMAR } from '../data/index.js';
 import { PageHead, TaskDone, useTask } from '../components/ui.jsx';
 import { useStore } from '../lib/store.jsx';
+import { ExplainButton } from '../components/ai/Ai.jsx';
 
 export function GrammarList() {
   return (
@@ -43,7 +44,9 @@ export function GrammarLesson() {
 
   return (
     <>
-      <PageHead kicker={`Grammar · lesson ${index + 1} of ${GRAMMAR.length}`} title={g.title} sub={g.summary} back={task ? '/' : '/grammar'} />
+      <PageHead kicker={`Grammar · lesson ${index + 1} of ${GRAMMAR.length}`} title={g.title} sub={g.summary} back={task ? '/' : '/grammar'}>
+        <ExplainButton small={false} label="Ask the tutor about this" prompt={`Teach me "${g.title}" for IELTS in a different way from my textbook: the key rule in one sentence, 3 examples from IELTS topics, and the mistake Bangla speakers make most often.`} />
+      </PageHead>
       <div className="stack">
         {g.sections.map((s) => (
           <section className="card stack" key={s.heading}>
@@ -79,6 +82,7 @@ export function GrammarLesson() {
                   ))}
                 </div>
                 {marked && <p className={right ? 'small muted' : 'q__answer'}>{right ? '' : `Answer: ${q.options[q.answer]}. `}{q.explain}</p>}
+                {marked && !right && <div><ExplainButton label="Explain more" prompt={`Grammar question: "${q.q}" Options: ${q.options.join(' / ')}. I chose "${q.options[answers[i]] ?? 'nothing'}" but the answer is "${q.options[q.answer]}". Explain the rule simply and give 3 more examples.`} /></div>}
               </div>
             );
           })}

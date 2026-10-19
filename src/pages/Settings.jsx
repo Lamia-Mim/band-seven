@@ -1,26 +1,30 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { addDays, diffDays, todayKey } from '../lib/dates.js';
+import { diffDays, todayKey } from '../lib/dates.js';
 import { PageHead } from '../components/ui.jsx';
+import { ExamDate, LevelTarget, PlanPreview, SkillRatings, TimeBudget } from '../components/PlanForm.jsx';
+import { useAi } from '../components/ai/Ai.jsx';
+import { providerName } from '../lib/ai/providers.js';
+import { Icon } from '../components/icons.jsx';
 
 export default function Settings() {
-  const { state, saveSettings, importData, resetAll } = useStore();
-  const s = state.settings;
-  const [form, setForm] = useState(s);
+  const { state, saveSettings, saveAi, importData, resetAll } = useStore();
+  const { openSetup, ai, ready } = useAi();
+  const [form, setForm] = useState(state.settings);
   const [msg, setMsg] = useState('');
-  const days = diffDays(form.startDate, form.examDate);
-  const valid = days >= 7;
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.type === 'radio' ? +e.target.value : e.target.value });
+  const set = (patch) => { setForm((f) => ({ ...f, ...patch })); setMsg(''); };
+  const valid = diffDays(form.startDate, form.examDate) >= 7;
 
   function save(e) {
     e.preventDefault();
     if (!valid) return;
-    saveSettings(form);
+    // theme and AI are saved separately; don't overwrite them with this form's copy
+    saveSettings({ ...form, theme: state.settings.theme, ai: state.settings.ai });
     setMsg('Saved. Your plan has been rebuilt; tasks you already finished stay finished.');
   }
 
   function exportData() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ ...state, settings: { ...state.settings, ai: { ...state.settings.ai, geminiKey: undefined, claudeKey: undefined } } }, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `band-seven-backup-${todayKey()}.json`;
@@ -41,27 +45,42 @@ export default function Settings() {
 
   return (
     <>
-      <PageHead title="Settings" />
-      <div className="stack" style={{ maxWidth: 640 }}>
+      <PageHead title="Settings" sub="Change your plan, your AI tutor and how the app looks." />
+      <div className="stack" style={{ maxWidth: 720, gap: 20 }}>
         <form className="card stack" onSubmit={save}>
           <h2>Your plan</h2>
-          <label className="field">Name<input type="text" value={form.name} onChange={set('name')} /></label>
-          <label className="field">Exam date<input type="date" value={form.examDate} min={addDays(form.startDate, 7)} onChange={set('examDate')} /></label>
-          <label className="field">Plan start date<input type="date" value={form.startDate} max={addDays(form.examDate, -7)} onChange={set('startDate')} /><small>{valid ? `${days} days of study` : 'The exam must be at least a week after the start.'}</small></label>
-          <fieldset style={{ border: 0, padding: 0, margin: 0 }} className="stack">
-            <legend style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Sections per day</legend>
-            <label className="choice"><input type="radio" name="load" value="2" checked={form.load === 2} onChange={set('load')} /><span><b>2 sections</b> · about 1 hour</span></label>
-            <label className="choice"><input type="radio" name="load" value="4" checked={form.load === 4} onChange={set('load')} /><span><b>All 4 sections</b> · about 2 hours</span></label>
-          </fieldset>
-          <label className="field">Theme
-            <select value={form.theme} onChange={set('theme')}><option value="system">Match my device</option><option value="light">Light</option><option value="dark">Dark</option></select>
-          </label>
-          <div className="row"><button type="submit" className="btn primary" disabled={!valid}>Save</button>{msg && <span className="muted small">{msg}</span>}</div>
+          <label className="field">Name<input type="text" value={form.name || ''} onChange={(e) => set({ name: e.target.value })} /></label>
+          <div className="stack" style={{ gap: 6 }}><b>Exam date</b><ExamDate form={form} set={set} /></div>
+          <LevelTarget form={form} set={set} />
+          <div className="stack" style={{ gap: 6 }}><b>Skill ratings</b><SkillRatings form={form} set={set} /></div>
+          <div className="stack" style={{ gap: 6 }}><b>Daily time</b><TimeBudget form={form} set={set} /></div>
+          <details><summary className="small" style={{ cursor: 'pointer' }}>Preview the plan</summary><div style={{ marginTop: 12 }}><PlanPreview form={form} /></div></details>
+          <div className="row"><button type="submit" className="btn primary" disabled={!valid}>Save and rebuild plan</button>{msg && <span className="muted small">{msg}</span>}</div>
         </form>
 
         <section className="card stack">
+          <h2>AI tutor</h2>
+          <div className="row">
+            <span className={`chip ${ready ? 'ok' : ''}`}><Icon name="sparkle" width="14" />{ready ? providerName(ai) : 'Not set up'}</span>
+            <span className="spacer" />
+            <button type="button" className="btn" onClick={openSetup}>{ready ? 'Change' : 'Set up'}</button>
+            {ready && <button type="button" className="btn ghost danger" onClick={() => saveAi({ provider: null, geminiKey: '', claudeKey: '' })}>Turn off and remove keys</button>}
+          </div>
+          <p className="small muted">The on-device option is free and private. Gemini needs a free key; Claude needs your own paid key. Keys stay in this browser and are not included in backups.</p>
+        </section>
+
+        <section className="card stack">
+          <h2>Appearance</h2>
+          <div className="seg">
+            {[['system', 'Match device'], ['light', 'Light'], ['dark', 'Dark']].map(([v, l]) => (
+              <button key={v} type="button" aria-pressed={(state.settings.theme || 'system') === v} onClick={() => saveSettings({ theme: v })}>{l}</button>
+            ))}
+          </div>
+        </section>
+
+        <section className="card stack">
           <h2>Backup</h2>
-          <p className="muted">Your progress lives in this browser. To move it to another device, download a backup here and restore it there.</p>
+          <p className="muted">Your progress lives in this browser. To use another device, download a backup here and restore it there.</p>
           <div className="row">
             <button type="button" className="btn" onClick={exportData}>Download backup</button>
             <label className="btn">Restore backup<input type="file" accept="application/json" hidden onChange={importFile} /></label>

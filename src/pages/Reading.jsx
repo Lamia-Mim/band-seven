@@ -3,6 +3,7 @@ import { READING } from '../data/index.js';
 import QuestionSet from '../components/QuestionSet.jsx';
 import { PageHead, TaskDone, Timer, useTask } from '../components/ui.jsx';
 import { ScoreSummary, useMarking } from '../components/useMarking.jsx';
+import { explainReading } from '../lib/ai/explain.js';
 
 export function Passage({ passage }) {
   return (
@@ -35,7 +36,7 @@ export default function Reading() {
         <div className="split">
           <Passage passage={passage} />
           <div className="card">
-            <QuestionSet groups={passage.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} />
+            <QuestionSet groups={passage.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} explain={(g, item, given) => explainReading(passage, g, item, given)} />
             {!m.result && (
               <div className="row" style={{ marginTop: 20 }}>
                 <span className="muted small">{m.answered}/{total} answered</span>

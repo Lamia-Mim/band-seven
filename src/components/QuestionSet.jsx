@@ -1,10 +1,12 @@
 import { isCorrect, optionValue } from '../lib/score.js';
+import { ExplainButton } from './ai/Ai.jsx';
 
 const TFNG = ['TRUE', 'FALSE', 'NOT GIVEN'];
 
 // Renders IELTS question groups. Before marking, answers are editable; after
 // marking (`marked`), each question shows right/wrong and the correct answer.
-export default function QuestionSet({ groups, answers, setAnswer, marked }) {
+// `explain(group, item, given)` returns a tutor prompt for a wrong answer
+export default function QuestionSet({ groups, answers, setAnswer, marked, explain }) {
   return (
     <div>
       {groups.map((g, gi) => {
@@ -57,9 +59,12 @@ export default function QuestionSet({ groups, answers, setAnswer, marked }) {
                     <input type="text" value={given} disabled={marked} onChange={(e) => setAnswer(item.n, e.target.value)} aria-label={`Answer ${item.n}`} autoComplete="off" spellCheck="false" style={{ maxWidth: 320 }} />
                   )}
                   {marked && !right && (
-                    <p className="q__answer">
-                      Answer: {g.type === 'gap' ? item.answer.join(' / ') : g.type === 'mcq' ? `${item.answer}) ${item.options[item.answer.charCodeAt(0) - 65]}` : item.answer}
-                    </p>
+                    <div className="row">
+                      <p className="q__answer">
+                        Answer: {g.type === 'gap' ? item.answer.join(' / ') : g.type === 'mcq' ? `${item.answer}) ${item.options[item.answer.charCodeAt(0) - 65]}` : item.answer}
+                      </p>
+                      {explain && <ExplainButton prompt={explain(g, item, given)} label="Why?" />}
+                    </div>
                   )}
                 </div>
               );

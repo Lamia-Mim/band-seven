@@ -1,49 +1,67 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { addDays, diffDays, formatDay, todayKey } from '../lib/dates.js';
+import { DEFAULT_SETTINGS } from '../lib/plan.js';
+import { addDays, diffDays, todayKey } from '../lib/dates.js';
+import { ExamDate, LevelTarget, PlanPreview, SkillRatings, TimeBudget } from '../components/PlanForm.jsx';
+import { Icon } from '../components/icons.jsx';
+import { confetti } from '../lib/confetti.js';
+
+const STEPS = [
+  { title: 'Hi! Let’s build a plan that fits you', sub: 'Two minutes of questions, then a day-by-day plan to your exam.' },
+  { title: 'When is your exam?', sub: 'The plan uses every day you have, and shortens the basics if time is tight.' },
+  { title: 'Your level and your goal', sub: 'This decides how much time goes on foundations.' },
+  { title: 'How do your skills feel?', sub: 'Be honest: the plan gives your weakest skills the most practice.' },
+  { title: 'How much time can you give?', sub: 'Pick what you can keep up every day. Consistency beats long sessions.' },
+  { title: 'Your personal plan', sub: 'Here is what the next weeks look like. You can change it any time in Settings.' },
+];
 
 export default function Onboarding() {
   const { saveSettings } = useStore();
   const today = todayKey();
-  const [name, setName] = useState('');
-  const [examDate, setExamDate] = useState(addDays(today, 84));
-  const [load, setLoad] = useState(2);
-  const days = diffDays(today, examDate);
-  const valid = days >= 7;
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState({ ...DEFAULT_SETTINGS, name: '', startDate: today, examDate: addDays(today, 84), theme: 'system' });
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
+  const valid = diffDays(form.startDate, form.examDate) >= 7;
+  const last = step === STEPS.length - 1;
 
-  function start(e) {
-    e.preventDefault();
-    if (valid) saveSettings({ name: name.trim(), examDate, startDate: today, load, theme: 'system' });
+  function next() {
+    if (!last) { setStep(step + 1); return; }
+    saveSettings({ ...form, name: form.name.trim() });
+    confetti();
   }
 
   return (
     <div className="onboard">
-      <form className="card raised" onSubmit={start}>
-        <div className="row"><img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width="40" height="40" /><p className="kicker">Band Seven · IELTS Academic</p></div>
-        <h1>Let’s build your study plan</h1>
-        <p className="muted">Tell us when your exam is. You’ll get a daily list of tasks across all four sections, with a reward every time you finish a day.</p>
+      <form className="wizard" onSubmit={(e) => { e.preventDefault(); if (valid) next(); }}>
+        <div className="row">
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width="40" height="40" style={{ borderRadius: 12 }} />
+          <b style={{ fontFamily: 'var(--display)', fontSize: 20 }}>Band Seven</b>
+          <span className="spacer" />
+          <span className="small muted">{step + 1} / {STEPS.length}</span>
+        </div>
+        <div className="steps-dots" aria-hidden="true">{STEPS.map((_, i) => <i key={i} className={i <= step ? 'on' : ''} />)}</div>
+        <div>
+          <h1>{STEPS[step].title}</h1>
+          <p className="muted" style={{ marginTop: 6 }}>{STEPS[step].sub}</p>
+        </div>
 
-        <label className="field">Your name <small>Optional, for greetings</small>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Lamia" autoComplete="given-name" />
-        </label>
-
-        <label className="field">Exam date
-          <input type="date" value={examDate} min={addDays(today, 7)} onChange={(e) => setExamDate(e.target.value)} required />
-          <small>{valid ? `${days} days from today · ${formatDay(examDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. No date yet? Keep the default 12 weeks.` : 'Choose a date at least a week from today.'}</small>
-        </label>
-
-        <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend className="field" style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Sections per day</legend>
-          <label className="choice"><input type="radio" name="load" checked={load === 2} onChange={() => setLoad(2)} />
-            <span><b>2 sections a day</b><br /><span className="muted small">Reading + Speaking one day, Listening + Writing the next, plus vocabulary. About 1 hour.</span></span>
+        {step === 0 && (
+          <label className="field">What should we call you?
+            <input type="text" value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder="Your name" autoComplete="given-name" autoFocus />
           </label>
-          <label className="choice"><input type="radio" name="load" checked={load === 4} onChange={() => setLoad(4)} />
-            <span><b>All 4 sections every day</b><br /><span className="muted small">Reading, Listening, Writing and Speaking daily, plus vocabulary. About 2 hours.</span></span>
-          </label>
-        </fieldset>
+        )}
+        {step === 1 && <ExamDate form={form} set={set} />}
+        {step === 2 && <LevelTarget form={form} set={set} />}
+        {step === 3 && <SkillRatings form={form} set={set} />}
+        {step === 4 && <TimeBudget form={form} set={set} />}
+        {step === 5 && <PlanPreview form={form} />}
 
-        <button type="submit" className="btn primary lg" disabled={!valid}>Create my plan</button>
-        <p className="muted small">Everything stays on this device. You can change these later in Settings.</p>
+        <div className="row">
+          {step > 0 && <button type="button" className="btn ghost" onClick={() => setStep(step - 1)}>Back</button>}
+          <span className="spacer" />
+          <button type="submit" className="btn primary lg" disabled={!valid}>{last ? <><Icon name="sparkle" />Start my plan</> : 'Continue'}</button>
+        </div>
+        {step === 0 && <p className="small muted">Free, no account. Everything stays on this device.</p>}
       </form>
     </div>
   );

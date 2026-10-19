@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import { GRAMMAR, WORDS, READING, LISTENING, TASK1, TASK2, PART1, CUE_CARDS } from '../src/data/index.js';
 import { TIPS, PHRASE_PACKS, PHASE_GUIDES } from '../src/data/rewards.js';
+import { MASTERCLASSES } from '../src/data/masterclasses.js';
+import { LEVELS } from '../src/lib/progress.js';
 import { optionValue } from '../src/lib/score.js';
 
 const numbers = (sections) => sections.flatMap((s) => s.groups.flatMap((g) => g.items.map((i) => i.n)));
@@ -58,5 +60,11 @@ describe('content', () => {
     expect(TIPS.length).toBeGreaterThanOrEqual(84);
     expect(PHRASE_PACKS.length).toBeGreaterThanOrEqual(6);
     expect(PHASE_GUIDES).toHaveLength(4);
+  });
+
+  it('has one masterclass for each level from 2 up, each with content', () => {
+    expect(MASTERCLASSES.map((m) => m.level)).toEqual(Array.from({ length: MASTERCLASSES.length }, (_, i) => i + 2));
+    expect(MASTERCLASSES.at(-1).level).toBeLessThanOrEqual(LEVELS.length);
+    for (const m of MASTERCLASSES) expect(m.sections.length).toBeGreaterThanOrEqual(2);
   });
 });

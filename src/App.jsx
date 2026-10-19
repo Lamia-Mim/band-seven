@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useStore } from './lib/store.jsx';
 import { diffDays, todayKey } from './lib/dates.js';
+import { isDue } from './lib/srs.js';
 import { Icon } from './components/icons.jsx';
 import RewardModal from './components/RewardModal.jsx';
+import { AiProvider, useAi } from './components/ai/Ai.jsx';
 import Onboarding from './pages/Onboarding.jsx';
 import Today from './pages/Today.jsx';
 import Plan from './pages/Plan.jsx';
@@ -14,31 +16,41 @@ import Reading from './pages/Reading.jsx';
 import Listening from './pages/Listening.jsx';
 import Writing from './pages/Writing.jsx';
 import { SpeakingHub, SpeakingCard, SpeakingPart1, SpeakingFull } from './pages/Speaking.jsx';
+import Talk from './pages/Talk.jsx';
 import { MockHub, MockListening, MockReading, MockWriting } from './pages/Mock.jsx';
 import Book from './pages/Book.jsx';
 import Review from './pages/Review.jsx';
 import Library from './pages/Library.jsx';
-import Rewards from './pages/Rewards.jsx';
+import Rewards, { Masterclass } from './pages/Rewards.jsx';
 import Progress from './pages/Progress.jsx';
 import Settings from './pages/Settings.jsx';
 import ExamDay from './pages/ExamDay.jsx';
 
 const NAV = [
   ['/', 'Today', 'today'],
-  ['/plan', 'Plan', 'plan'],
+  ['/plan', 'My plan', 'plan'],
+  ['/talk', 'Voice room', 'wave'],
   ['/practice', 'Practice', 'practice'],
   ['/words', 'Words', 'words'],
   ['/mock', 'Mock tests', 'mock'],
-  ['/library', 'Library', 'library'],
   ['/rewards', 'Rewards', 'rewards'],
   ['/progress', 'Progress', 'progress'],
+  ['/library', 'Library', 'library'],
   ['/settings', 'Settings', 'settings'],
 ];
 
 export default function App() {
   const { state } = useStore();
+  if (!state.settings) return <Onboarding />;
+  return <AiProvider><Shell /></AiProvider>;
+}
+
+function Shell() {
+  const { state, allWords } = useStore();
+  const { openTutor } = useAi();
   const { pathname } = useLocation();
   const [more, setMore] = useState(false);
+  const today = todayKey();
 
   useEffect(() => { window.scrollTo(0, 0); setMore(false); }, [pathname]);
   useEffect(() => {
@@ -47,9 +59,8 @@ export default function App() {
     else delete document.documentElement.dataset.theme;
   }, [state.settings?.theme]);
 
-  if (!state.settings) return <Onboarding />;
-
-  const left = diffDays(todayKey(), state.settings.examDate);
+  const left = diffDays(today, state.settings.examDate);
+  const due = allWords.filter((w) => isDue(state.vocab[w.id], today)).length;
 
   return (
     <div className="app">
@@ -58,10 +69,13 @@ export default function App() {
         {NAV.map(([to, label, icon]) => (
           <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Icon name={icon} />{label}
+            {to === '/words' && due > 0 && <span className="pill">{due}</span>}
           </NavLink>
         ))}
-        <div className="countdown">
-          {left > 0 ? <><b>{left}</b>{left === 1 ? 'day' : 'days'} to your exam</> : left === 0 ? <><b>Today</b>Good luck!</> : <><b>Done</b>Exam finished</>}
+        <div className="side-foot">
+          <div className="mini-count">
+            {left > 0 ? <><b>{left}</b><span>{left === 1 ? 'day' : 'days'} to your exam</span></> : left === 0 ? <><b>Today</b><span>Good luck!</span></> : <><b>Done</b><span>Exam finished</span></>}
+          </div>
         </div>
       </aside>
 
@@ -69,6 +83,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Today />} />
           <Route path="/plan" element={<Plan />} />
+          <Route path="/talk" element={<Talk />} />
           <Route path="/practice" element={<Practice />} />
           <Route path="/grammar" element={<GrammarList />} />
           <Route path="/grammar/:id" element={<GrammarLesson />} />
@@ -89,6 +104,7 @@ export default function App() {
           <Route path="/review" element={<Review />} />
           <Route path="/library" element={<Library />} />
           <Route path="/rewards" element={<Rewards />} />
+          <Route path="/masterclass/:id" element={<Masterclass />} />
           <Route path="/progress" element={<Progress />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/exam-day" element={<ExamDay />} />
@@ -96,16 +112,21 @@ export default function App() {
         </Routes>
       </main>
 
+      {pathname !== '/talk' && (
+        <button type="button" className="fab" onClick={() => openTutor()} aria-label="Ask the AI tutor"><Icon name="sparkle" /><span>Ask tutor</span></button>
+      )}
+
       <nav className="tabbar" aria-label="Main navigation">
-        {NAV.slice(0, 4).map(([to, label, icon]) => (
-          <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => (isActive ? 'active' : '')}><Icon name={icon} />{label}</NavLink>
-        ))}
+        <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}><Icon name="today" />Today</NavLink>
+        <NavLink to="/plan" className={({ isActive }) => (isActive ? 'active' : '')}><Icon name="plan" />Plan</NavLink>
+        <NavLink to="/talk" className="mic-tab" aria-label="Voice room"><span className="disc"><Icon name="mic" /></span></NavLink>
+        <NavLink to="/words" className={({ isActive }) => (isActive ? 'active' : '')}><Icon name="words" />Words</NavLink>
         <button type="button" onClick={() => setMore(true)}><Icon name="more" />More</button>
       </nav>
       {more && (
         <div className="sheet-backdrop" onClick={() => setMore(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="More">
-            {NAV.slice(4).map(([to, label, icon]) => (
+            {NAV.filter(([to]) => !['/', '/plan', '/words'].includes(to)).map(([to, label, icon]) => (
               <NavLink key={to} to={to} className="nav-link"><Icon name={icon} />{label}</NavLink>
             ))}
           </div>

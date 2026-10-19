@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useStore } from '../lib/store.jsx';
 import { addDays, todayKey } from '../lib/dates.js';
 import { PageHead, TaskDone, useTask } from '../components/ui.jsx';
+import { ExplainButton } from '../components/ai/Ai.jsx';
 
 export default function Review() {
   const { state, clearMistakes } = useStore();
@@ -27,7 +28,8 @@ export default function Review() {
             {list.map((m, i) => (
               <div key={i} className="stack" style={{ gap: 2, paddingTop: 10, borderTop: i ? '1px solid var(--line)' : 0 }}>
                 <p>{m.prompt}</p>
-                <p className="small"><span className="chip bad">yours</span> {m.yours} <span className="chip ok" style={{ marginLeft: 8 }}>answer</span> {m.answer}</p>
+                <div className="row small"><span className="chip bad">yours</span> {m.yours} <span className="chip ok" style={{ marginLeft: 8 }}>answer</span> {m.answer}<span className="spacer" />
+                  <ExplainButton label="Why?" prompt={`In my IELTS practice (${m.source}) I got this wrong: "${m.prompt}". My answer: "${m.yours}". Correct answer: "${m.answer}". Explain why, and give me a rule or strategy so I don't repeat the mistake.`} /></div>
               </div>
             ))}
           </section>

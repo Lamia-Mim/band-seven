@@ -4,6 +4,7 @@ import QuestionSet from '../components/QuestionSet.jsx';
 import ScriptPlayer, { Script } from '../components/ScriptPlayer.jsx';
 import { PageHead, TaskDone, useTask } from '../components/ui.jsx';
 import { ScoreSummary, useMarking } from '../components/useMarking.jsx';
+import { explainListening } from '../lib/ai/explain.js';
 
 export default function Listening() {
   const { id } = useParams();
@@ -20,7 +21,7 @@ export default function Listening() {
         <TaskDone show={!!m.result && done} />
         <ScriptPlayer sections={[section]} />
         <div className="card">
-          <QuestionSet groups={section.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} />
+          <QuestionSet groups={section.groups} answers={m.answers} setAnswer={m.setAnswer} marked={!!m.result} explain={(g, item, given) => explainListening(section, g, item, given)} />
           {!m.result && (
             <div className="row" style={{ marginTop: 20 }}>
               <span className="muted small">{m.answered}/10 answered</span>

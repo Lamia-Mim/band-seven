@@ -5,6 +5,10 @@ import { CHECKLIST } from '../data/writing.js';
 import Chart from '../components/Chart.jsx';
 import { PageHead, TaskDone, Timer, useTask, wordCount } from '../components/ui.jsx';
 import { useStore } from '../lib/store.jsx';
+import { useAi } from '../components/ai/Ai.jsx';
+import { writingFeedbackPrompt } from '../lib/ai/prompts.js';
+import Markdown from '../components/Markdown.jsx';
+import { Icon } from '../components/icons.jsx';
 
 export const findPrompt = (id) => {
   const t1 = TASK1.find((t) => t.id === id);
@@ -66,6 +70,7 @@ export function Feedback({ prompt }) {
         ))}
         <p className="muted small">Every box you can’t tick is your next target. Rewrite one paragraph with that target in mind.</p>
       </section>
+      <AiFeedback prompt={prompt} />
       {prompt.model && submitted && (
         <section className="card stack">
           <div className="row"><h2>Model answer</h2><span className="chip gold">unlocked</span><span className="spacer" /><span className="muted small">{wordCount(prompt.model)} words</span></div>
@@ -74,6 +79,49 @@ export function Feedback({ prompt }) {
         </section>
       )}
     </>
+  );
+}
+
+// The AI examiner marks the answer against the four criteria
+function AiFeedback({ prompt }) {
+  const { state, saveFeedback } = useStore();
+  const { requireAi, stream } = useAi();
+  const saved = state.writing[prompt.id]?.feedback;
+  const [text, setText] = useState(saved || '');
+  const [busy, setBusy] = useState(false);
+  const answer = state.writing[prompt.id]?.text || '';
+
+  function run() {
+    // the saved text belongs to this prompt (a mock has two editors on the page)
+    const essay = answer || document.querySelector('.writing-box textarea')?.value || '';
+    if (wordCount(essay) < 40) { setText('Write at least a few paragraphs first, then ask for feedback.'); return; }
+    requireAi(async () => {
+      setBusy(true);
+      setText('');
+      let out = '';
+      try {
+        for await (const t of stream({ system: 'You are an experienced, fair IELTS Writing examiner. Be specific and encouraging.', messages: [{ role: 'user', content: writingFeedbackPrompt(prompt, essay) }] })) {
+          out += t;
+          setText(out);
+        }
+        saveFeedback(prompt.id, out);
+      } catch (e) {
+        setText(`⚠️ ${e.message}`);
+      } finally {
+        setBusy(false);
+      }
+    });
+  }
+
+  return (
+    <section className="card raised stack" style={{ borderTop: '4px solid var(--brand)' }}>
+      <div className="row">
+        <Icon name="sparkle" /><h2>AI examiner feedback</h2><span className="spacer" />
+        <button type="button" className="btn primary sm" onClick={run} disabled={busy}>{busy ? 'Marking…' : text ? 'Mark again' : 'Get feedback'}</button>
+      </div>
+      {text ? <Markdown text={text} /> : !busy && <p className="muted small">Band estimates for each criterion, your top corrections, and a paragraph rewritten to Band 7+.</p>}
+      {busy && !text && <span className="typing"><span /><span /><span /></span>}
+    </section>
   );
 }
 
