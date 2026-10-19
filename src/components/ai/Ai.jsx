@@ -3,7 +3,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useStore } from '../../lib/store.jsx';
-import { AiError, CLAUDE_MODELS, LOCAL_MODELS, aiReady, geminiModel, hasWebGPU, isLocalDownloaded, loadLocal, providerName, streamChat } from '../../lib/ai/providers.js';
+import { AiError, CLAUDE_MODELS, LOCAL_MODELS, aiReady, checkDevice, geminiModel, hasWebGPU, isLocalDownloaded, isPhone, loadLocal, providerName, recommendedModel, streamChat } from '../../lib/ai/providers.js';
 import { tutorSystem } from '../../lib/ai/prompts.js';
 import { canSpeak, canTranscribe, createSpeaker, listenTurn } from '../../lib/speech.js';
 import Markdown from '../Markdown.jsx';
@@ -28,11 +28,14 @@ export function AiProvider({ children }) {
 
   const openTutor = useCallback((seed) => requireAi(() => setDrawer({ seed: seed || null, key: Date.now() })), [requireAi]);
 
-  // Stream with the current settings; on-device loading progress is shared
-  const stream = useCallback((opts) => streamChat(ai, {
+  // Stream with the latest settings. Read through a ref: an action that waited
+  // for setup to finish still holds the stream function from before setup.
+  const aiRef = useRef(ai);
+  aiRef.current = ai;
+  const stream = useCallback((opts) => streamChat(aiRef.current, {
     ...opts,
     onStatus: (p) => setProgress(p.progress >= 1 ? null : p),
-  }), [ai]);
+  }), []);
 
   const value = { ai, ready, openTutor, requireAi, openSetup: () => setSetup(true), stream, progress };
 
@@ -51,22 +54,31 @@ export function AiSetup({ onClose }) {
   const { state, saveAi } = useStore();
   const current = state.settings?.ai || {};
   const [provider, setProvider] = useState(current.provider || (hasWebGPU() ? 'local' : 'gemini'));
-  const [localModel, setLocalModel] = useState(current.localModel || LOCAL_MODELS[1].id);
+  const [localModel, setLocalModel] = useState(current.localModel || recommendedModel());
   const [geminiKey, setGeminiKey] = useState(current.geminiKey || '');
   const [claudeKey, setClaudeKey] = useState(current.claudeKey || '');
   const [claudeModel, setClaudeModel] = useState(current.claudeModel || CLAUDE_MODELS[0].id);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [detail, setDetail] = useState('');
   const [prog, setProg] = useState(null);
   const [cached, setCached] = useState({});
+  const [device, setDevice] = useState(null); // { ok, f16 } once checked
+  const phone = isPhone();
+  const chosen = LOCAL_MODELS.find((m) => m.id === localModel);
 
   useEffect(() => {
+    checkDevice().then((d) => {
+      setDevice(d);
+      if (!d.ok && !current.provider) setProvider('gemini'); // this device can't run it: start on the free option that can
+    });
     Promise.all(LOCAL_MODELS.map((m) => isLocalDownloaded(m.id))).then((r) => setCached(Object.fromEntries(LOCAL_MODELS.map((m, i) => [m.id, r[i]]))));
   }, []);
 
   async function connect() {
     setBusy(true);
     setMsg('');
+    setProg(null);
     try {
       if (provider === 'local') {
         await loadLocal(localModel, (p) => setProg(p));
@@ -82,6 +94,7 @@ export function AiSetup({ onClose }) {
       onClose(true);
     } catch (e) {
       setMsg(e.message || 'Couldn’t connect.');
+      setDetail(e.detail && e.detail !== e.message ? e.detail : '');
     } finally {
       setBusy(false);
     }
@@ -102,7 +115,7 @@ export function AiSetup({ onClose }) {
         <div className="stack" style={{ gap: 10 }}>
           {options.map((o) => (
             <button key={o.id} type="button" className="provider" aria-pressed={provider === o.id} onClick={() => setProvider(o.id)}>
-              <span className="row"><Icon name={o.icon} width="20" height="20" /><b>{o.title}</b><span className="chip accent">{o.tag}</span></span>
+              <span className="row"><Icon name={o.icon} width="20" height="20" /><b>{o.title}</b><span className="chip accent">{o.id === 'local' && device && !device.ok ? 'Not available in this browser' : o.tag}</span></span>
               <span className="small muted">{o.body}</span>
             </button>
           ))}
@@ -110,19 +123,25 @@ export function AiSetup({ onClose }) {
 
         {provider === 'local' && (
           <div className="stack" style={{ gap: 8 }}>
-            {!hasWebGPU() && <p className="notice warn">This browser doesn’t support WebGPU, so on-device AI won’t run here. Try Chrome or Edge, or choose Gemini.</p>}
-            {LOCAL_MODELS.map((m) => (
+            {device && !device.ok && (
+              <p className="notice warn">
+                This {phone ? 'phone’s' : ''} browser can’t run the on-device AI (WebGPU isn’t available).
+                {phone ? ' On Android, update Chrome; on iPhone, update to the latest iOS. ' : ' Try the latest Chrome or Edge. '}
+                Or choose <b>Gemini</b> above: it’s free and works on any phone.
+              </p>
+            )}
+            {device?.ok && !device.f16 && <p className="small muted">This device’s graphics chip needs the 32-bit version of each model, which is about a third larger.</p>}
+            {LOCAL_MODELS.map((m, i) => (
               <label key={m.id} className="choice">
                 <input type="radio" name="lm" checked={localModel === m.id} onChange={() => setLocalModel(m.id)} />
-                <span><b>{m.name}</b> · {m.size} {cached[m.id] && <span className="chip ok">downloaded</span>}<br /><span className="small muted">{m.note}</span></span>
+                <span>
+                  <b>{m.name}</b> · {m.size} {cached[m.id] && <span className="chip ok">downloaded</span>}
+                  {m.id === recommendedModel() && !cached[m.id] && <span className="chip accent">{phone ? 'best for phones' : 'recommended'}</span>}
+                  {phone && i >= 2 && <span className="chip">may be too big for a phone</span>}
+                  <br /><span className="small muted">{m.note}</span>
+                </span>
               </label>
             ))}
-            {prog && (
-              <div className="stack" style={{ gap: 6 }}>
-                <div className="progressbar"><i style={{ width: `${Math.round((prog.progress || 0) * 100)}%` }} /></div>
-                <p className="small muted">{prog.text}</p>
-              </div>
-            )}
           </div>
         )}
         {provider === 'gemini' && (
@@ -139,9 +158,45 @@ export function AiSetup({ onClose }) {
           </div>
         )}
         <p className="small muted">Keys are saved only in this browser and sent only to the provider you chose.</p>
-        {msg && <p className="notice warn">{msg}</p>}
-        <div className="row"><span className="spacer" /><button type="button" className="btn primary lg" onClick={connect} disabled={busy}>{busy ? (provider === 'local' ? 'Downloading…' : 'Connecting…') : provider === 'local' && !cached[localModel] ? 'Download and start' : 'Start'}</button></div>
+
+        <div className="modal-foot stack" style={{ gap: 10 }}>
+          {busy && provider === 'local' && (
+            <>
+              <ModelProgress prog={prog} size={chosen?.size} />
+              <p className="small muted">Keep this page open with the screen on. On mobile data this can take 5–15 minutes. If it stops, tap the button again: it continues where it left off.</p>
+            </>
+          )}
+          {msg && <p className="notice warn">{msg}{detail && <><br /><span className="small muted" style={{ wordBreak: 'break-word' }}>Details: {detail.slice(0, 300)}</span></>}</p>}
+          <div className="row"><span className="spacer" /><button type="button" className="btn primary lg" onClick={connect} disabled={busy || (provider === 'local' && device && !device.ok)}>{busy ? (provider === 'local' ? 'Downloading…' : 'Connecting…') : provider === 'local' && !cached[localModel] ? `Download ${chosen?.name ?? ''} · ${chosen?.size ?? ''}` : 'Start'}</button></div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+// Download / loading progress for the on-device model. WebLLM reports progress
+// once per ~35 MB part, so show elapsed time and a moving bar in between.
+export function ModelProgress({ prog, size }) {
+  const [start] = useState(() => Date.now());
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const text = prog?.text || '';
+  const part = text.match(/\[(\d+)\/(\d+)\]/);
+  const mb = text.match(/(\d+)\s*MB fetched/);
+  const pct = Math.round((prog?.progress || 0) * 100);
+  const label = !prog ? 'Preparing the AI engine…'
+    : mb ? `Downloading part ${part ? `${part[1]} of ${part[2]}` : ''} · ${mb[1]} MB${size ? ` of about ${size}` : ''}`
+      : /fetch params/i.test(text) ? `Downloading the model${size ? ` (about ${size})` : ''}…`
+        : /from cache/i.test(text) ? 'Loading the model from this device…'
+          : 'Getting the model ready…';
+  const secs = Math.round((Date.now() - start) / 1000);
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <div className="progressbar live"><i style={{ width: `${Math.max(pct, 2)}%` }} /></div>
+      <p className="small muted"><b>{pct}%</b> · {label} · {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</p>
     </div>
   );
 }

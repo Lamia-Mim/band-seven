@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { CUE_CARDS, PART1 } from '../data/index.js';
-import { useAi } from '../components/ai/Ai.jsx';
+import { ModelProgress, useAi } from '../components/ai/Ai.jsx';
 import { examinerSystem, partnerSystem, speakingFeedbackPrompt } from '../lib/ai/prompts.js';
 import { canSpeak, canTranscribe, createSpeaker, listenTurn, micLevel } from '../lib/speech.js';
 import { useStore } from '../lib/store.jsx';
@@ -216,7 +216,7 @@ function Talk({ search }) {
           </div>
           <p className="kicker">{live ? STATUS[prep ? 'prep' : status] : ready ? STATUS.idle : 'Tap the orb to set up the AI'}</p>
           {live && <p className="small muted">{mmss(elapsed)}{mode === 'chat' ? (goal ? ' · five minutes done: end whenever you like' : ' · aim for five minutes') : ''}</p>}
-          {progress && <div style={{ width: 'min(360px, 90%)' }}><div className="progressbar"><i style={{ width: `${Math.round(progress.progress * 100)}%` }} /></div><p className="small muted">Loading the on-device AI…</p></div>}
+          {progress && <div style={{ width: 'min(420px, 100%)' }}><ModelProgress prog={progress} /></div>}
           {live && aiText && <p className="caption">{aiText.replace(/[*#]/g, '')}</p>}
           {live && userText && <p className="caption user">“{userText}”</p>}
 

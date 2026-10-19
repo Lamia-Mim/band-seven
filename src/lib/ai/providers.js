@@ -14,9 +14,10 @@ export class AiError extends Error {
 }
 
 export const LOCAL_MODELS = [
-  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Light', size: '0.9 GB', note: 'Fastest. Short, simple explanations in English.' },
-  { id: 'Qwen3-1.7B-q4f16_1-MLC', name: 'Balanced', size: '2 GB', note: 'Better reasoning and some Bangla. Good for most laptops.' },
-  { id: 'Qwen3-4B-q4f16_1-MLC', name: 'Best', size: '3.4 GB', note: 'Best answers on this device. Needs a strong laptop.' },
+  { id: 'Qwen3-0.6B-q4f16_1-MLC', name: 'Phone', size: '0.4 GB', mb: 450, note: 'Made for phones. Quick, short explanations in English.' },
+  { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Light', size: '0.9 GB', mb: 900, note: 'Fast. Short, simple explanations in English.' },
+  { id: 'Qwen3-1.7B-q4f16_1-MLC', name: 'Balanced', size: '2 GB', mb: 2000, note: 'Better reasoning and some Bangla. Good for most laptops.' },
+  { id: 'Qwen3-4B-q4f16_1-MLC', name: 'Best', size: '3.4 GB', mb: 3400, note: 'Best answers on this device. Needs a strong laptop.' },
 ];
 
 export const CLAUDE_MODELS = [
@@ -43,26 +44,126 @@ export function providerName(ai) {
 
 // ---------- on-device ----------
 
+export const isPhone = () => typeof navigator !== 'undefined'
+  && (navigator.userAgentData?.mobile || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)); // iPad reports itself as a Mac
+export const recommendedModel = () => (isPhone() ? LOCAL_MODELS[0].id : LOCAL_MODELS[2].id);
+
+const NO_GPU = 'This browser can’t run the on-device AI here (WebGPU isn’t available). Update Chrome on Android or iOS on iPhone, or choose Gemini: it’s free and works on any phone.';
+
+// What the graphics chip can do. Many phones lack 16-bit float shaders,
+// so they get the 32-bit build of the same model.
+let deviceCheck = null;
+export function checkDevice() {
+  deviceCheck ??= (async () => {
+    if (!hasWebGPU()) return { ok: false };
+    try {
+      const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+      if (!adapter) return { ok: false };
+      return { ok: true, f16: adapter.features.has('shader-f16') };
+    } catch {
+      return { ok: false };
+    }
+  })();
+  return deviceCheck;
+}
+
+const buildFor = (id, f16) => (f16 ? id : id.replace('q4f16_1', 'q4f32_1'));
+const sizeOf = (id) => LOCAL_MODELS.find((m) => m.id === id || buildFor(m.id, false) === id)?.mb ?? 1000;
+
+// Where the model is stored. The Cache API is fastest, but on some phones and
+// private windows it fails; IndexedDB works there.
+const BACKEND_KEY = 'band7-llm-store';
+const backend = () => { try { return localStorage.getItem(BACKEND_KEY) || 'cache'; } catch { return 'cache'; } };
+const useIndexedDb = () => { try { localStorage.setItem(BACKEND_KEY, 'indexeddb'); } catch { /* ignore */ } };
+const appConfig = (webllm) => ({ ...webllm.prebuiltAppConfig, cacheBackend: backend() });
+
+async function cacheApiWorks() {
+  try {
+    const c = await caches.open('band7-probe');
+    await c.put('/band7-probe', new Response('ok'));
+    await caches.delete('band7-probe');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function makeRoom(mb) {
+  try { await navigator.storage?.persist?.(); } catch { /* best effort */ }
+  let free = Infinity;
+  try {
+    const { quota, usage = 0 } = (await navigator.storage?.estimate?.()) || {};
+    if (quota) free = (quota - usage) / 1048576;
+  } catch { /* unknown: try anyway */ }
+  if (free < mb * 1.1) throw new AiError('space', `This model needs about ${(mb / 1000).toFixed(1)} GB of free space, but the browser can only use ${(free / 1000).toFixed(1)} GB here. Free some space, choose a smaller model, or use Gemini.`);
+}
+
+function friendly(e) {
+  if (e instanceof AiError) return e;
+  const m = String(e?.message || e);
+  const out = toAiError(m);
+  out.detail = m; // the original error, shown small so it can be reported
+  return out;
+}
+
+function toAiError(m) {
+  if (/cachestorage|indexeddb|internal error/i.test(m)) return new AiError('space', 'This browser wouldn’t let the app save the model. Private or incognito tabs can’t store it: open the app in a normal tab, check there is free space, or use Gemini.');
+  if (/quota|storage|space/i.test(m)) return new AiError('space', 'The phone ran out of storage for the model. Free some space, choose the Phone model, or use Gemini.');
+  if (/fetch|network|load failed/i.test(m)) return new AiError('network', 'The download was interrupted. Check your internet, keep this page open with the screen on, and tap Download again: it continues from where it stopped.');
+  if (/device.*lost|memory|allocat/i.test(m)) return new AiError('gpu', 'This device ran out of memory for that model. Choose a smaller one (Phone), or use Gemini.');
+  if (/f16|webgpu|adapter/i.test(m)) return new AiError('gpu', NO_GPU);
+  return new AiError('other', m);
+}
+
+function create(webllm, id, onProgress) {
+  const worker = new Worker(new URL('./webllm.worker.js', import.meta.url), { type: 'module' });
+  return webllm.CreateWebWorkerMLCEngine(worker, id, { appConfig: appConfig(webllm), initProgressCallback: (p) => onProgress?.(p) })
+    .catch((e) => { worker.terminate(); throw e; });
+}
+
+async function startEngine(id, onProgress) {
+  const webllm = await import('@mlc-ai/web-llm');
+  if (backend() === 'cache' && !(await cacheApiWorks())) useIndexedDb();
+  const cached = await webllm.hasModelInCache(id, appConfig(webllm)).catch(() => false);
+  let lock = null;
+  if (!cached) {
+    await makeRoom(sizeOf(id));
+    try { lock = await navigator.wakeLock?.request('screen'); } catch { /* not allowed: fine */ }
+  }
+  try {
+    return await create(webllm, id, onProgress);
+  } catch (e) {
+    if (backend() === 'cache' && /cache/i.test(String(e?.message || e))) {
+      useIndexedDb();
+      return await create(webllm, id, onProgress).catch((e2) => { throw friendly(e2); });
+    }
+    throw friendly(e);
+  } finally {
+    lock?.release?.().catch(() => {});
+  }
+}
+
 let engine = null, engineModel = null;
 
 export async function loadLocal(modelId, onProgress) {
-  if (!hasWebGPU()) throw new AiError('gpu', 'This browser or device doesn’t support WebGPU, which the on-device AI needs. Try Chrome or Edge on a recent laptop, or use a free Gemini key instead.');
-  if (engine && engineModel === modelId) return engine;
-  const { CreateWebWorkerMLCEngine } = await import('@mlc-ai/web-llm');
-  engineModel = modelId;
-  engine = CreateWebWorkerMLCEngine(
-    new Worker(new URL('./webllm.worker.js', import.meta.url), { type: 'module' }),
-    modelId,
-    { initProgressCallback: (p) => onProgress?.(p) },
-  );
+  const device = await checkDevice();
+  if (!device.ok) throw new AiError('gpu', NO_GPU);
+  const id = buildFor(modelId, device.f16);
+  if (engine && engineModel === id) return engine;
+  engineModel = id;
+  engine = startEngine(id, onProgress);
   engine.catch(() => { engine = null; engineModel = null; });
   return engine;
 }
 
 export async function isLocalDownloaded(modelId) {
   try {
-    const { hasModelInCache } = await import('@mlc-ai/web-llm');
-    return await hasModelInCache(modelId);
+    const device = await checkDevice();
+    if (!device.ok) return false;
+    const webllm = await import('@mlc-ai/web-llm');
+    if (backend() === 'cache' && !(await cacheApiWorks())) useIndexedDb();
+    return await webllm.hasModelInCache(buildFor(modelId, device.f16), appConfig(webllm));
   } catch {
     return false;
   }

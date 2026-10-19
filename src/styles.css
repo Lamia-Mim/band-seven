@@ -399,10 +399,12 @@ input[type='range'] { width: 100%; accent-color: var(--brand); }
 
 /* ---------- modals ---------- */
 .modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(12, 10, 30, .55); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 16px; animation: fade .2s; }
-.modal { width: min(520px, 100%); max-height: 90vh; overflow: auto; background: var(--surface); border-radius: 26px; padding: 28px; box-shadow: var(--shadow-lg); display: grid; gap: 12px; animation: popin .4s cubic-bezier(.2, .9, .3, 1.2); }
+.modal { width: min(520px, 100%); max-height: 90vh; max-height: 90dvh; overflow: auto; overscroll-behavior: contain; background: var(--surface); border-radius: 26px; padding: 28px; box-shadow: var(--shadow-lg); display: grid; gap: 12px; animation: popin .4s cubic-bezier(.2, .9, .3, 1.2); }
 .modal .badge { width: 64px; height: 64px; border-radius: 20px; display: grid; place-items: center; background: var(--grad); color: #fff; box-shadow: 0 12px 24px -10px rgba(91, 75, 255, .8); }
 .modal .badge svg { width: 32px; height: 32px; }
 .modal h2 { font-size: 23px; }
+/* keeps the main action visible while the modal scrolls on small screens */
+.modal .modal-foot { position: sticky; bottom: -28px; z-index: 1; margin: 0 -28px -28px; padding: 16px 28px 28px; background: var(--surface); box-shadow: 0 -14px 18px -14px rgba(12, 10, 30, .35); }
 .modal ul { margin: 0; padding-left: 18px; }
 @keyframes popin { from { transform: translateY(20px) scale(.92); opacity: 0; } }
 .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 70; }
@@ -436,6 +438,11 @@ input[type='range'] { width: 100%; accent-color: var(--brand); }
 .provider[aria-pressed='true'] { border-color: var(--brand); background: var(--brand-soft); }
 .progressbar { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
 .progressbar i { display: block; height: 100%; background: var(--grad); transition: width .3s; }
+/* a light sweeping across the bar: still working between progress updates */
+.progressbar.live { position: relative; }
+.progressbar.live::after { content: ''; position: absolute; inset: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .6), transparent); animation: sweep 1.4s linear infinite; }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) { .progressbar.live::after { animation: none; } }
 
 /* voice room */
 .voice { display: grid; justify-items: center; gap: 18px; padding: 10px 0 20px; text-align: center; }
